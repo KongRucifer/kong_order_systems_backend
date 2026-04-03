@@ -28,7 +28,9 @@
     "migration:run:cli": "npx typeorm-ts-node-commonjs migration:run -d src/database/data-source.ts",
     "migration:revert:cli": "npx typeorm-ts-node-commonjs migration:revert -d src/database/data-source.ts",
     "permissions:generate": "NODE_OPTIONS=\"--max-old-space-size=450\" ts-node -r tsconfig-paths/register src/database/generate-permissions.ts",
-    "seed": "NODE_OPTIONS=\"--max-old-space-size=450\" ts-node -r tsconfig-paths/register src/database/seed.ts"
+    "seed": "NODE_OPTIONS=\"--max-old-space-size=450\" ts-node -r tsconfig-paths/register src/database/seed.ts",
+    "permissions:generate:simple": "echo 'Skipping permissions for now - will be generated later'",
+    "seed:simple": "echo 'Skipping seed for now - will be added later'"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.987.0",
