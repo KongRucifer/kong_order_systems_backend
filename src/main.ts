@@ -12,7 +12,7 @@ async function bootstrap() {
 
   // 2. Configure CORS with proper settings
   app.enableCors({
-    origin: ['http://localhost:5173', 'http://localhost:3000', 'https://kong-order-systems-backend.onrender.com'],
+    origin: '*', // Allow all origins for development
     credentials: true,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     allowedHeaders: 'Content-Type, Authorization',
