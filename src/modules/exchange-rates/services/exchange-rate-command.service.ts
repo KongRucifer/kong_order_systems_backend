@@ -1,0 +1,183 @@
+import {
+  ForbiddenException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { TransactionService } from '../../../common/transaction/transaction.service';
+import { ExchangeRateRepository } from '../repositories/exchange-rate.repository';
+import { MerchantRepository } from '../../merchants/repositories/merchant.repository';
+import {
+  ExchangeRateCreateDto,
+  ExchangeRateCreateManyDto,
+} from '../dto/exchange-rate-create.dto';
+import { ExchangeRateUpdateDto } from '../dto/exchange-rate-update.dto';
+import { ExchangeRateOrmEntity } from '../entities/exchange-rate.orm-entity';
+import { CurrentUserPayload } from 'src/common/decorators/current-user.decorator';
+import { UserOrmEntity } from 'src/modules/users/entities/user.orm-entity';
+import { CACHE_MANAGER, Cache } from '@nestjs/cache-manager';
+import e from 'express';
+
+@Injectable()
+export class ExchangeRateCommandService {
+  constructor(
+    private readonly transactionService: TransactionService,
+    private readonly exchangeRateRepository: ExchangeRateRepository,
+    private readonly merchantRepository: MerchantRepository,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
+  ) {}
+
+  async create(
+    dto: ExchangeRateCreateDto,
+    currentUser: CurrentUserPayload,
+  ): Promise<{ id: number }> {
+    if (!currentUser?.merchantId) {
+      throw new ForbiddenException('Merchant context required for this action');
+    }
+    return this.transactionService.run(async (manager) => {
+      const merchant = await this.merchantRepository.findOneById(
+        currentUser.merchantId!,
+        manager,
+      );
+      if (!merchant) throw new NotFoundException('Merchant not found');
+
+      const rateDate = new Date();
+
+      await this.exchangeRateRepository.getRepo(manager).update(
+        {
+          merchant: { id: currentUser.merchantId! },
+          rateType: dto.rateType,
+          isActive: true,
+        },
+        { isActive: false },
+      );
+
+      const entity = await this.exchangeRateRepository.create(
+        {
+          merchant,
+          baseCurrency: dto.baseCurrency,
+          targetCurrency: dto.targetCurrency,
+          rateType: dto.rateType,
+          rate: dto.rate,
+          isActive: true,
+          rateDate,
+          createdByUser: { id: currentUser.userId } as UserOrmEntity,
+        } as Partial<ExchangeRateOrmEntity>,
+        manager,
+      );
+      console.log('entity', entity);
+      await this.clearExchangeRateCache();
+      return { id: entity.id };
+    });
+  }
+
+  async createMany(
+    dto: ExchangeRateCreateManyDto,
+    currentUser: CurrentUserPayload,
+  ): Promise<{ ids: number[] }> {
+    if (!currentUser?.merchantId) {
+      throw new ForbiddenException('Merchant context required for this action');
+    }
+
+    return this.transactionService.run(async (manager) => {
+      const merchant = await this.merchantRepository.findOneById(
+        currentUser.merchantId!,
+        manager,
+      );
+
+      if (!merchant) throw new NotFoundException('Merchant not found');
+
+      const rateDate = new Date();
+      const ids: number[] = [];
+
+      for (const item of dto.items) {
+        // ปิดเรทเก่าที่ active อยู่
+        await this.exchangeRateRepository.getRepo(manager).update(
+          {
+            merchant: { id: currentUser.merchantId! },
+            rateType: item.rateType,
+            isActive: true,
+          },
+          { isActive: false },
+        );
+
+        // สร้างเรทใหม่
+        const entity = await this.exchangeRateRepository.create(
+          {
+            merchant,
+            baseCurrency: item.baseCurrency,
+            targetCurrency: item.targetCurrency,
+            rateType: item.rateType,
+            rate: item.rate,
+            isActive: true,
+            rateDate,
+            createdByUser: { id: currentUser.userId } as UserOrmEntity,
+          } as Partial<ExchangeRateOrmEntity>,
+          manager,
+        );
+
+        ids.push(entity.id);
+      }
+      await this.clearExchangeRateCache();
+      return { ids };
+    });
+  }
+
+  async update(
+    id: number,
+    dto: ExchangeRateUpdateDto,
+    currentUser?: CurrentUserPayload,
+  ): Promise<void> {
+    await this.transactionService.run(async (manager) => {
+      if (currentUser) {
+        const existing = await this.exchangeRateRepository.findOneById(
+          id,
+          manager,
+        );
+        if (!existing) throw new NotFoundException('Exchange rate not found');
+      } else {
+        const existing = await this.exchangeRateRepository.findOneById(
+          id,
+          manager,
+        );
+        if (!existing) throw new NotFoundException('Exchange rate not found');
+      }
+      const updateData: Partial<ExchangeRateOrmEntity> = {};
+      if (dto.baseCurrency !== undefined)
+        updateData.baseCurrency = dto.baseCurrency;
+      if (dto.targetCurrency !== undefined)
+        updateData.targetCurrency = dto.targetCurrency;
+      if (dto.rateType !== undefined) updateData.rateType = dto.rateType;
+      if (dto.rate !== undefined) updateData.rate = dto.rate;
+      if (dto.rateDate !== undefined)
+        updateData.rateDate = new Date(dto.rateDate);
+      if (dto.isActive !== undefined) updateData.isActive = dto.isActive;
+      await this.clearExchangeRateCache();
+      await this.exchangeRateRepository.update(id, updateData, manager);
+    });
+  }
+
+  async delete(id: number): Promise<void> {
+    await this.transactionService.run(async (manager) => {
+      const existing = await this.exchangeRateRepository.findOneById(
+        id,
+        manager,
+      );
+      if (!existing) throw new NotFoundException('Exchange rate not found');
+      await this.clearExchangeRateCache();
+      await this.exchangeRateRepository.delete(id, manager);
+    });
+  }
+
+  private async clearExchangeRateCache() {
+    const store: any = (this.cacheManager as any).store;
+
+    if (store?.keys) {
+      const keys: string[] = await store.keys();
+
+      const exchangeKeys = keys.filter((k) => k.includes('/exchange-rate'));
+
+      await Promise.all(exchangeKeys.map((k) => this.cacheManager.del(k)));
+    }
+  }
+}

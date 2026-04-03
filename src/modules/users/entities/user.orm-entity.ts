@@ -1,0 +1,41 @@
+import {
+  Column,
+  Entity,
+  ManyToOne,
+  JoinColumn,
+} from 'typeorm';
+import { RoleOrmEntity } from '../../roles/entities/role.orm-entity';
+import { BaseOrmEntity } from '../../../common/base/enities/base.orm-entities';
+import { MerchantOrmEntity } from 'src/modules/merchants/entities/merchant.orm-entity';
+
+@Entity('users')
+export class UserOrmEntity extends BaseOrmEntity {
+  @Column({ unique: true })
+  email: string;
+
+  @Column({ name: 'password_hash' })
+  passwordHash: string;
+
+  @Column({ name: 'full_name' })
+  fullName: string;
+
+  @Column({ name: 'role_id', type: 'number' })
+  roleId: number;
+
+  @ManyToOne(() => RoleOrmEntity, { onDelete: 'RESTRICT' })
+  @JoinColumn({ name: 'role_id' })
+  role: RoleOrmEntity;
+
+  @Column({ name: 'merchant_id', type: 'number', nullable: true })
+  merchantId?: number | null;
+
+  @ManyToOne(() => MerchantOrmEntity, { onDelete: 'CASCADE', nullable: true })
+  @JoinColumn({ name: 'merchant_id' })
+  merchant?: MerchantOrmEntity | null;
+
+  @Column({ name: 'is_active', default: true })
+  isActive: boolean;
+
+  @Column({ name: 'last_login', type: 'timestamp', nullable: true })
+  lastLogin: Date | null;
+}

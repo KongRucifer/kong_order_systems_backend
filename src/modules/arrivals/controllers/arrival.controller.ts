@@ -1,0 +1,138 @@
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiParam, ApiBearerAuth } from '@nestjs/swagger';
+import { ArrivalCommandService } from '../services/arrival-command.service';
+import { ArrivalQueryService } from '../services/arrival-query.service';
+import { CreateArrivalDto } from '../dto/create-arrival.dto';
+import { CreateMultipleArrivalsDto } from '../dto/create-multiple-arrivals.dto';
+import { ArrivalUpdateDto } from '../dto/arrival-update.dto';
+import { ArrivalListQueryDto } from '../dto/arrival-list-query.dto';
+import { ArrivalResponseDto } from '../dto/arrival-response.dto';
+import { CurrentUser } from '../../../common/decorators/current-user.decorator';
+import type { CurrentUserPayload } from '../../../common/decorators/current-user.decorator';
+import {
+  ApiCreatedResponseBase,
+  ApiBadRequestBase,
+  ApiUnauthorizedBase,
+  ApiNotFoundBase,
+  ApiOkResponseBase,
+} from '../../../common/swagger/swagger.decorators';
+
+@ApiTags('Arrivals')
+@Controller('arrivals')
+export class ArrivalController {
+  constructor(
+    private readonly arrivalCommandService: ArrivalCommandService,
+    private readonly arrivalQueryService: ArrivalQueryService,
+  ) {}
+
+  @Post('create')
+  @ApiOperation({ summary: 'Record arrival, create arrival items, update stock, and send notifications' })
+  @ApiBearerAuth('BearerAuth')
+  @ApiCreatedResponseBase()
+  @ApiBadRequestBase()
+  @ApiUnauthorizedBase()
+  @ApiNotFoundBase()
+  async merchantCreate(
+    @Body() dto: CreateArrivalDto,
+    @CurrentUser() currentUser: CurrentUserPayload,
+  ) {
+    return this.arrivalCommandService.create(dto, currentUser);
+  }
+
+  @Post('create-multiple')
+  @ApiOperation({ summary: 'Record multiple arrivals for different orders in a single transaction' })
+  @ApiBearerAuth('BearerAuth')
+  @ApiCreatedResponseBase()
+  @ApiBadRequestBase()
+  @ApiUnauthorizedBase()
+  @ApiNotFoundBase()
+  async merchantCreateMultiple(
+    @Body() dto: CreateMultipleArrivalsDto,
+    @CurrentUser() currentUser: CurrentUserPayload,
+  ) {
+    return this.arrivalCommandService.createMultiple(dto, currentUser);
+  }
+
+  @Get()
+  @ApiOperation({ summary: 'List arrivals with pagination' })
+  @ApiBearerAuth('BearerAuth')
+  @ApiOkResponseBase()
+  @ApiUnauthorizedBase()
+  async adminGetList(@Query() query: ArrivalListQueryDto) {
+    return this.arrivalQueryService.getList(query);
+  }
+
+  @Get('summary')
+  @ApiOperation({ summary: 'Get arrival summary (admin - optional merchantId)' })
+  @ApiBearerAuth('BearerAuth')
+  @ApiOkResponseBase()
+  @ApiUnauthorizedBase()
+  async adminGetSummary(@Query() query: ArrivalListQueryDto) {
+    return this.arrivalQueryService.getSummary(query);
+  }
+
+  @Get('by-merchant')
+  @ApiOperation({ summary: 'List arrivals for the authenticated merchant (auto-filter by JWT token)' })
+  @ApiBearerAuth('BearerAuth')
+  @ApiOkResponseBase()
+  @ApiUnauthorizedBase()
+  async merchantGetList(
+    @Query() query: ArrivalListQueryDto,
+    @CurrentUser() currentUser: CurrentUserPayload,
+  ) {
+    return this.arrivalQueryService.getListByMerchant(query, currentUser);
+  }
+
+  @Get('by-merchant/summary')
+  @ApiOperation({ summary: 'Get arrival summary for the authenticated merchant' })
+  @ApiBearerAuth('BearerAuth')
+  @ApiOkResponseBase()
+  @ApiUnauthorizedBase()
+  async merchantGetSummary(
+    @Query() query: ArrivalListQueryDto,
+    @CurrentUser() currentUser: CurrentUserPayload,
+  ) {
+    return this.arrivalQueryService.getSummaryByMerchant(query, currentUser);
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Get arrival by ID' })
+  @ApiBearerAuth('BearerAuth')
+  @ApiParam({ name: 'id', description: 'Arrival ID' })
+  @ApiOkResponseBase(ArrivalResponseDto)
+  @ApiNotFoundBase()
+  @ApiUnauthorizedBase()
+  async getById(@Param('id', ParseIntPipe) id: number) {
+    return this.arrivalQueryService.getByIdOrFail(id);
+  }
+
+  @Patch(':id')
+  @ApiOperation({ summary: 'Update arrival' })
+  @ApiBearerAuth('BearerAuth')
+  @ApiParam({ name: 'id', description: 'Arrival ID' })
+  @ApiOkResponseBase()
+  @ApiBadRequestBase()
+  @ApiNotFoundBase()
+  @ApiUnauthorizedBase()
+  async merchantUpdate(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: ArrivalUpdateDto,
+  ) {
+    return this.arrivalCommandService.update(id, dto);
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'Delete arrival' })
+  @ApiBearerAuth('BearerAuth')
+  @ApiParam({ name: 'id', description: 'Arrival ID' })
+  @ApiNotFoundBase()
+  @ApiUnauthorizedBase()
+  async adminDelete(@Param('id', ParseIntPipe) id: number) {
+    return this.arrivalCommandService.delete(id);
+  }
+
+
+
+  
+  
+}
