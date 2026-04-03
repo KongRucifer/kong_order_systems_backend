@@ -22,5 +22,6 @@ export function getDatabaseConfig(config: ConfigService): TypeOrmModuleOptions {
     synchronize: false,
     autoLoadEntities: true,
     entities: [join(__dirname, '/../**/*.orm-entity.js')],
+    ssl: type === 'mysql' ? { rejectUnauthorized: false } : { rejectUnauthorized: false },
   };
 }
